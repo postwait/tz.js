@@ -1,8 +1,8 @@
 This is tz.js
 =============
 
-This supports all noermal unix timezones.  It provide Date() compatible
-javascript objects to move to and from various timezones.
+This supports all normal UNIX timezones.  It provides Date() compatible
+Javascript objects to move to and from various timezones.
 
 This software is Copyright (c) 2010 OmniTI Computer Consulting, Inc.
 
@@ -11,10 +11,10 @@ It is released under an MIT license.
 Use
 ===
 
-script include the tz.js file and place the zoneinfo directory relative
-to it.  zoneinfo is loaded on-demand by the client.
+<script> include the tz.js file and place the zoneinfo directory relative
+to it.  zoneinfo info is loaded on-demand by the client.
 
-TZ.date(<timzone>, epoch_ms)
+TZ.date(<timezone>, epoch_ms)
 
 TZ.date(<timezone>, year, month, day, ...) // Same as Date() constructor
 
