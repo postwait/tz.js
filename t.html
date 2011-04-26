@@ -1,0 +1,18 @@
+<html>
+<body>
+<script type="text/javascript" src="./tz.js"></script>
+<script type="text/javascript">
+  for(var i = 0; i < 10; i++) {
+      var t = 1289106000 + (i*3600) + 1;
+      var d = TZ.date('US/Pacific', t * 1000);
+document.write(t + ' as ' + +(new Date(t*1000)) + ' tzdate ' + d + '<hr/>');
+  }
+
+  for(var i = 0; i < 180; i++) {
+      var d = TZ.date('US/Pacific', 2010, 10, 07, Math.floor(i/30), (i%30)*2, 0, 0);
+      var tzd = TZ.date('US/Pacific', d.getTime());
+document.write('2010/11/07 '+Math.floor(i/30) + ':' + ((i%30)*2) + ' as ' + ' tzdate ' + d + ' ('+tzd+')<hr/>');
+  }
+</script>
+</body>
+</html>
