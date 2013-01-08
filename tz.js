@@ -71,6 +71,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
             }
         };
     };
+
     var timeZone = function(h) {
         var name = h.name,
             offset = h.offset,
@@ -102,6 +103,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
                     else l = i+1;
                     i = Math.round((l + r)/2);
                 }
+                if(i > zi.trans_times.length) i = zi.trans_times.length;
                 if(w > zi.trans_times[i]) i++;
                 return zi.tz[zi.trans_types[i - 1]];
             }
@@ -169,7 +171,8 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
     var load = function(zonename) {
         if (TZ.cache[zonename]) return TZ.cache[zonename];
         return parse_zoneinfo(zonename);
-    }
+    };
+
     var date = function(zonename) {
         var zi = load(zonename), tz,
             utc, hack, crack, zoff, sign;
@@ -207,6 +210,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
           sign = zoff < 0 ? '-' : '+';
           zoff = (Math.floor(Math.abs(zoff/60)) * 100 + (Math.abs(zoff) % 60));
         }
+
         function newlocal(year,month,day,hours,minutes,seconds,ms) {
           year = (typeof(year)==="undefined" || year == null) ?
                    hack.getUTCFullYear() : year;
@@ -237,10 +241,9 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
             str = str.replace(/GMT[-+]\d{4}/, "GMT" + repl)
                      .replace(/\(.+\)$/, "(" + tz.name() + ")");
             return str;
-        }
+        };
         return {
             'getTime': function() { return utc.getTime(); },
-            'setTime': function(o) { return update(o); },
             'getTimezoneOffset': function() { return tz.offset / -60; },
             'getDate': function() { return hack.getUTCDate(); },
             'getDay': function() { return hack.getUTCDay(); },
@@ -252,6 +255,10 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
             'getMinutes': function() { return hack.getUTCMinutes(); },
             'getSeconds': function() { return hack.getUTCSeconds(); },
 
+            'setFullDate': function (y,m,d,h,n,s,ms)
+            { return newlocal(y,m,d,h,n,s,ms); },
+            'setTime': function (o)
+            { return update(o); },
             'setFullYear': function(o)
               { return newlocal(o); },
             'setMonth': function(o)
@@ -294,7 +301,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
             'setUTCSeconds': function(o)
               { update(utc.setUTCSeconds(o)); return utc.getTime(); },
 
-            'toUTCString': function() { return fixup(utc.toUTCString()); },
+            'toUTCString': function() { return fix(utc.toUTCString()); },
             // These are the annoying ones as there's no way to get at
             // the internal locale's format for dates...
             'toDateString': function() { return fix(crack.toDateString()); },
@@ -302,9 +309,10 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
             'toLocaleTimeString': function() { return fix(crack.toLocaleTimeString()); },
             'toLocaleString': function() { return fix(crack.toLocaleString()); },
             'toString': function() { return fix(crack.toString()); },
-            'toTimeString': function() { return fix(crack.toTimeString()); }
+            'toTimeString': function() { return fix(crack.toTimeString()); },
+            'valueOf': function () { return utc.getTime(); }
         };
-    }
+    };
 
     TZ.load = load;
     TZ.date = date;
