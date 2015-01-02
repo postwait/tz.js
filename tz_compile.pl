@@ -1,10 +1,13 @@
 #!/usr/bin/perl
 
 use File::Find;
+use JSON;
 use IO::File;
 my $top = shift;
 my $total = 0;
 die "needs directory" unless -d $top;
+
+my @tzs = ();
 
 sub process {
   (my $dir = $File::Find::dir) =~ s#^$top\/?##;
@@ -21,8 +24,12 @@ sub process {
   my $o = IO::File->new(">zoneinfo/$name.json") || die "Cannot create $name: $!";
   print $o "{'data':'$data'};\n";
   print " in $dir -> $name $s[7]\n";
+  push @tzs, $name;
 }
 mkdir('zoneinfo') unless -d 'zoneinfo';
 find({ wanted => \&process, no_chdir => 1, follow => 1 }, $top);
 
 print "Total: $total\n";
+
+my $list = IO::File->new(">zones.json");
+print $list encode_json(\@tzs);
