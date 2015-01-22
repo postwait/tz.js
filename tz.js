@@ -108,7 +108,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
                 return zi.tz[zi.trans_types[i - 1]];
             }
         };
-        var url = TZ.base + zonename + '.json';
+        var url = TZ.base + zonename.replace(/\s/g, '_') + '.json';
         var f = file(url);
         // skip the header
         if(f.seek(28, f.SEEK_SET) != 28) return null;
