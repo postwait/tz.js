@@ -1,6 +1,10 @@
-if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
+if (typeof TZ === "undefined"){ var TZ = { base: '/js/zoneinfo/', cache: {} }; }
 
 (function (TZ) {
+    var LS = false;
+    try {
+        LS = 'localStorage' in window && window['localStorage'] !== null;
+    } catch (e) { }
     var file = function (url) {
         var input_data = [];
         var input_pos = 0;
@@ -9,7 +13,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
             var xhrObj = false;
             try { xhrObj = new XMLHttpRequest(); }
             catch(e) {
-                var aTypes = ["Msxml2.XMLHTTP.6.0", "Msxml2.XMLHTTP.3.0", 
+                var aTypes = ["Msxml2.XMLHTTP.6.0", "Msxml2.XMLHTTP.3.0",
                               "Msxml2.XMLHTTP", "Microsoft.XMLHTTP"];
                 var len = aTypes.length;
                 for ( var i=0; i < len; i++ ) {
@@ -27,7 +31,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
                 xhr.open('GET', url, false);
                 xhr.send();
                 var info = {};
-                eval('info = ' + xhr.responseText); 
+                eval('info = ' + xhr.responseText);
                 var str = info.data;
                 var len = str.length;
                 for(var i = 0; i<len; i+=2)
@@ -73,41 +77,70 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
     };
 
     var timeZone = function(h) {
-        var name = h.name,
-            offset = h.offset,
-            dst = h.dst;
-        return {
-            'name': function() { return name; },
-            'offset': function() { return offset; },
-            'isdst': function() { return dst; }
-        };
-    };
+      this._name = h.name;
+      this._offset = h.offset;
+      this._dst = h.dst;
+    }
+    timeZone.prototype.name = function() { return this._name }
+    timeZone.prototype.offset = function() { return this._offset }
+    timeZone.prototype.isdst = function() { return this._dst }
+
+    var activate_zone = function(zi) {
+        this.zi = zi
+        for (var i = 0; i < this.zi.typecnt; ++i) {
+            this.zi.tz[i] = new timeZone(this.zi.tz[i]);
+        }
+        // normal timezone is the first non-daylight savings zone
+        var n = 0;
+        while (this.zi.tz[n].isdst() && n < this.zi.tz.length)
+            ++n;
+        this.zi.normaltz = this.zi.tz[n];
+        var ts = (new Date()).getTime() / 1000;
+        for (var i = 0; i < 9; i++) {
+            // walk in 3 month increments
+            var tz = this.getTZ(ts + 7776000*i);
+            if (!tz.isdst()) {
+                tz.normaltz = tz;
+                break;
+            }
+        }
+    }
+
+    activate_zone.prototype.name = function() { return this.zi.normaltz.name(); }
+    activate_zone.prototype.getTZ = function(w) {
+        // find the dst 'before' our whence (binary search)
+        var l = 1, r = this.zi.trans_times.length;
+        if(r == 0) return this.zi.tz[0];
+        var i = Math.round((l + r)/2);
+        while(i > l) {
+            if(l >= this.zi.trans_times.length) {
+                i = this.zi.trans_times.length;
+                break;
+            }
+            if(l == i) break;
+            if(this.zi.trans_times[i] == w) { i++; break; }
+            else if(this.zi.trans_times[i] > w) r = i-1;
+            else l = i+1;
+            i = Math.round((l + r)/2);
+        }
+        if(i > this.zi.trans_times.length) i = this.zi.trans_times.length;
+        if(w > this.zi.trans_times[i]) i++;
+        return this.zi.tz[this.zi.trans_types[i - 1]];
+    }
+
 
     var parse_zoneinfo = function(zonename) {
         var zi = { };
-        var o = {
-            'name': function() { return zi.normaltz.name(); },
-            'getTZ': function(w) {
-                // find the dst 'before' our whence (binary search)
-                var l = 1, r = zi.trans_times.length;
-                if(r == 0) return zi.tz[0];
-                var i = Math.round((l + r)/2);
-                while(i > l) {
-                    if(l >= zi.trans_times.length) {
-                        i = zi.trans_times.length;
-                        break;
-                    }
-                    if(l == i) break;
-                    if(zi.trans_times[i] == w) { i++; break; }
-                    else if(zi.trans_times[i] > w) r = i-1;
-                    else l = i+1;
-                    i = Math.round((l + r)/2);
-                }
-                if(i > zi.trans_times.length) i = zi.trans_times.length;
-                if(w > zi.trans_times[i]) i++;
-                return zi.tz[zi.trans_types[i - 1]];
-            }
-        };
+
+        if(LS && localStorage['timezone/' + zonename]) {
+          try {
+            zi = JSON.parse(localStorage['timezone/' + zonename]);
+            var o = new activate_zone(zi);
+            TZ.cache[zonename] = o;
+            return o;
+          } catch(e) {}
+        }
+
         var url = TZ.base + zonename.replace(/\s/g, '_') + '.json';
         var f = file(url);
         // skip the header
@@ -139,31 +172,18 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
             var end = pos;
             while(end < zi.charcnt && str.charCodeAt(end) != 0) ++end;
             zi.tz[i].name = str.substring(pos, end);
-            zi.tz[i] = timeZone(zi.tz[i]);
         }
 
         // this is the leap second information
         zi.leap_secs = new Array(zi.leapcnt *2);
         var leapcnt = zi.leapcnt;
         for (var i = 0; leapcnt > 0; --leapcnt) {
-	    zi.leap_secs[i++] = f.readInt();
-	    zi.leap_secs[i++] = f.readInt();
+	          zi.leap_secs[i++] = f.readInt();
+	          zi.leap_secs[i++] = f.readInt();
         }
 
-        // normal timezone is the first non-daylight savings zone
-        var n = 0;
-        while (zi.tz[n].isdst() && n < zi.tz.length)
-            ++n;
-        zi.normaltz = zi.tz[n];
-        var ts = (new Date()).getTime() / 1000;
-        for (var i = 0; i < 9; i++) {
-            // walk in 3 month increments
-            var tz = o.getTZ(ts + 7776000*i);
-            if (!tz.isdst()) {
-	        tz.normaltz = tz;
-	        break;
-            }
-        }
+        if(LS) localStorage['timezone/' + zonename] = JSON.stringify(zi);
+        o = new activate_zone(zi)
         TZ.cache[zonename] = o;
         return o;
     };
@@ -173,29 +193,39 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
         return parse_zoneinfo(zonename);
     };
 
-    var date = function(zonename) {
+    var _date = function(backwards, zonename) {
         var zi = load(zonename), tz,
             utc, hack, crack, zoff, sign;
-        var ms_whence = arguments[1];
+        var ms_whence = arguments[2];
         var args = ([]).slice.call(arguments);
-        if(ms_whence == null) ms_whence = (new Date()).getTime();
         if(zi == null) return new Date(args.splice(1));
-
+        if(typeof ms_whence === 'object' && ms_whence.constructor === 'Date') {
+          var d = ms_whence
+          return date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(),
+                      d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds());
+        }
+        if(ms_whence == null) ms_whence = (new Date()).getTime();
         if(arguments.length > 2) {
           // extended date form
-          var year = arguments[1];
-              month = (arguments.length > 2) ? arguments[2] : 1,
-              day = (arguments.length > 3) ? arguments[3] : 1,
-              hours = (arguments.length > 4) ? arguments[4] : 0,
-              minutes = (arguments.length > 5) ? arguments[5] : 0,
-              seconds = (arguments.length > 6) ? arguments[6] : 0,
-              milliseconds = (arguments.length > 7) ? arguments[7] : 0;
-          ms_whence = Date.UTC(year,month,day,hours,minutes,seconds,milliseconds);
-          var tz1 = zi.getTZ(ms_whence/1000);
-          ms_whence -= tz1.offset()*1000;
+          var year = arguments[2],
+              month = (arguments.length > 3) ? arguments[3] : 1,
+              day = (arguments.length > 4) ? arguments[4] : 1,
+              hours = (arguments.length > 5) ? arguments[5] : 0,
+              minutes = (arguments.length > 6) ? arguments[6] : 0,
+              seconds = (arguments.length > 7) ? arguments[7] : 0,
+              milliseconds = (arguments.length > 8) ? arguments[8] : 0;
+          if(arguments.length > 3) {
+              ms_whence = Date.UTC(year,month,day,hours,minutes,seconds,milliseconds);
+          } else {
+              ms_whence = (new Date(arguments[2])).getTime();
+          }
+          if(!backwards) {
+              var tz1 = zi.getTZ(ms_whence/1000);
+              ms_whence -= tz1.offset()*1000;
+          }
         }
 
-        function update(new_whence) {
+        var update = function(new_whence) {
           tz = zi.getTZ(new_whence/1000);
           utc = new Date(new_whence);
           hack = new Date(new_whence + tz.offset()*1000);
@@ -211,7 +241,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
           zoff = (Math.floor(Math.abs(zoff/60)) * 100 + (Math.abs(zoff) % 60));
         }
 
-        function newlocal(year,month,day,hours,minutes,seconds,ms) {
+        var newlocal = function(year,month,day,hours,minutes,seconds,ms) {
           year = (typeof(year)==="undefined" || year == null) ?
                    hack.getUTCFullYear() : year;
           month = (typeof(month)==="undefined" || month == null) ?
@@ -227,22 +257,29 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
           ms = (typeof(ms)==="undefined" || ms == null) ?
                            hack.getUTCMilliseconds() : ms;
           var whence = Date.UTC(year,month,day,hours,minutes,seconds,ms);
-          var tz1 = zi.getTZ(whence/1000);
-          whence -= tz1.offset()*1000;
+          if(!backwards) {
+              var tz1 = zi.getTZ(whence/1000);
+              whence -= tz1.offset()*1000;
+          }
           update(whence);
           return utc.getTime();
         }
-
         update(ms_whence);
+
         var fix = function(str) {
             var repl = sign;
             if(Math.abs(zoff) < 1000) repl = repl + '0';
+            if(Math.abs(zoff) < 100) repl = repl + '0';
+            if(Math.abs(zoff) < 10) repl = repl + '0';
             repl = repl + zoff.toString(10);
             str = str.replace(/GMT[-+]\d{4}/, "GMT" + repl)
                      .replace(/\(.+\)$/, "(" + tz.name() + ")");
             return str;
         };
         return {
+            '_getUTC': function() { return utc; },
+            '_getHACK': function() { return hack; },
+            '_getCRACK': function() { return crack; },
             'getTime': function() { return utc.getTime(); },
             'getTimezoneOffset': function() { return tz.offset / -60; },
             'getDate': function() { return hack.getUTCDate(); },
@@ -313,7 +350,18 @@ if (typeof TZ === "undefined"){ var TZ = { base: 'zoneinfo/', cache: {} }; }
             'valueOf': function () { return utc.getTime(); }
         };
     };
+    var date = function() {
+      var args = ([]).slice.call(arguments);
+      args.unshift(false);
+      return _date.apply(this, args);
+    }
+    var undate = function() {
+      var args = ([]).slice.call(arguments);
+      args.unshift(true);
+      return _date.apply(this, args);
+    }
 
     TZ.load = load;
     TZ.date = date;
+    TZ.undate = undate;
 })(TZ);
