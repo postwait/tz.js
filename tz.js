@@ -205,7 +205,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: '/js/zoneinfo/', cache: {} }; }
                       d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds());
         }
         if(ms_whence == null) ms_whence = (new Date()).getTime();
-        if(arguments.length > 2) {
+        if(arguments.length > 3) {
           // extended date form
           var year = arguments[2],
               month = (arguments.length > 3) ? arguments[3] : 1,
@@ -214,11 +214,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: '/js/zoneinfo/', cache: {} }; }
               minutes = (arguments.length > 6) ? arguments[6] : 0,
               seconds = (arguments.length > 7) ? arguments[7] : 0,
               milliseconds = (arguments.length > 8) ? arguments[8] : 0;
-          if(arguments.length > 3) {
-              ms_whence = Date.UTC(year,month,day,hours,minutes,seconds,milliseconds);
-          } else {
-              ms_whence = (new Date(arguments[2])).getTime();
-          }
+          ms_whence = Date.UTC(year,month,day,hours,minutes,seconds,milliseconds);
           if(!backwards) {
               var tz1 = zi.getTZ(ms_whence/1000);
               ms_whence -= tz1.offset()*1000;
