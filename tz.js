@@ -281,7 +281,7 @@ if (typeof TZ === "undefined"){ var TZ = { base: '/js/zoneinfo/', cache: {} }; }
             '_getHACK': function() { return hack; },
             '_getCRACK': function() { return crack; },
             'getTime': function() { return utc.getTime(); },
-            'getTimezoneOffset': function() { return tz.offset / -60; },
+            'getTimezoneOffset': function() { return tz.offset(); / -60; },
             'getDate': function() { return hack.getUTCDate(); },
             'getDay': function() { return hack.getUTCDay(); },
             'getMonth': function() { return hack.getUTCMonth(); },
